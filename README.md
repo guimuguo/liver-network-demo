@@ -2,8 +2,8 @@
 
 Interactive prototype built for the New Jersey Health Foundation Research Grant
 application *Network-Based Discovery of Molecular Signatures of Cancer
-Therapy-Induced Liver Injury* (Sophia Orbach, Biomedical Engineering, and
-Guimu Guo, Computer Science, Rowan University).
+Therapy-Induced Liver Injury* (Guimu Guo, PI, Computer Science, and
+Sophia Orbach, Co-PI, Biomedical Engineering, Rowan University).
 
 Live page: https://guimuguo.github.io/liver-network-demo/
 
