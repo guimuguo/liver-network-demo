@@ -1,0 +1,569 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Liver Injury Network Explorer</title>
+<meta name="description" content="Interactive prototype: graph mining of cyclophosphamide-induced liver injury in HepaRG spheroids. Simulated data illustrating the planned workflow (Guo Lab and Orbach Lab, Rowan University).">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
+<style>
+:root {
+  color-scheme: light;
+  --page: #f9f9f7; --surface: #fcfcfb; --surface-2: #f3f2ee;
+  --ink: #0b0b0b; --ink-2: #52514e; --muted: #898781;
+  --grid: #e1e0d9; --axis: #c3c2b7; --border: rgba(11,11,11,0.10);
+  --s1: #2a78d6; --s2: #eb6834; --s3: #1baf7a; --s4: #eda100; --s5: #e87ba4;
+  --div-neg: #2a78d6; --div-mid: #f0efec; --div-pos: #e34948;
+  --accent: #2a78d6; --good: #006300; --warn: #b36b00;
+  --shadow: 0 1px 2px rgba(0,0,0,.05), 0 4px 16px rgba(0,0,0,.05);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --page: #0d0d0d; --surface: #1a1a19; --surface-2: #222221;
+    --ink: #ffffff; --ink-2: #c3c2b7; --muted: #898781;
+    --grid: #2c2c2a; --axis: #383835; --border: rgba(255,255,255,0.10);
+    --s1: #3987e5; --s2: #d95926; --s3: #199e70; --s4: #c98500; --s5: #d55181;
+    --div-neg: #3987e5; --div-mid: #383835; --div-pos: #e66767;
+    --accent: #3987e5; --good: #0ca30c; --warn: #fab219;
+    --shadow: 0 1px 2px rgba(0,0,0,.4), 0 4px 16px rgba(0,0,0,.35);
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --page: #0d0d0d; --surface: #1a1a19; --surface-2: #222221;
+  --ink: #ffffff; --ink-2: #c3c2b7; --muted: #898781;
+  --grid: #2c2c2a; --axis: #383835; --border: rgba(255,255,255,0.10);
+  --s1: #3987e5; --s2: #d95926; --s3: #199e70; --s4: #c98500; --s5: #d55181;
+  --div-neg: #3987e5; --div-mid: #383835; --div-pos: #e66767;
+  --accent: #3987e5; --good: #0ca30c; --warn: #fab219;
+  --shadow: 0 1px 2px rgba(0,0,0,.4), 0 4px 16px rgba(0,0,0,.35);
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body {
+  background: var(--page); color: var(--ink);
+  font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+a { color: var(--accent); }
+.wrap { max-width: 1240px; margin: 0 auto; padding: 0 16px; }
+
+header.top { padding: 28px 0 12px; }
+.brandline { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; font-size: 13px; color: var(--ink-2); }
+.badge { display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px; border-radius: 999px; font-size: 12px; font-weight: 600; border: 1px solid var(--border); background: var(--surface); color: var(--ink-2); }
+.badge.sim { color: var(--warn); border-color: color-mix(in oklab, var(--warn) 40%, transparent); }
+h1 { font-size: clamp(24px, 3.4vw, 36px); line-height: 1.15; margin: 10px 0 6px; letter-spacing: -0.01em; }
+.lede { max-width: 760px; color: var(--ink-2); margin: 0 0 8px; font-size: 16px; }
+.toolbar { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-left: auto; }
+.topline { display: flex; align-items: flex-start; gap: 12px; flex-wrap: wrap; }
+
+.filters { position: sticky; top: 0; z-index: 5; background: color-mix(in oklab, var(--page) 88%, transparent); backdrop-filter: blur(8px); padding: 10px 0; border-bottom: 1px solid var(--border); margin-bottom: 18px; }
+.filters .row { display: flex; gap: 18px; align-items: center; flex-wrap: wrap; }
+.fgroup { display: flex; align-items: center; gap: 8px; }
+.fgroup .lbl { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; font-weight: 600; }
+.seg { display: inline-flex; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; background: var(--surface); }
+.seg button { appearance: none; border: 0; background: transparent; color: var(--ink-2); padding: 7px 12px; font: inherit; font-size: 13.5px; cursor: pointer; }
+.seg button + button { border-left: 1px solid var(--border); }
+.seg button[aria-pressed="true"] { background: var(--ink); color: var(--surface); font-weight: 600; }
+.ghost { appearance: none; border: 1px solid var(--border); background: var(--surface); color: var(--ink-2); border-radius: 8px; padding: 6px 10px; font: inherit; font-size: 13px; cursor: pointer; }
+.ghost:hover { color: var(--ink); }
+
+.tiles { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 18px; }
+.tile { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px; box-shadow: var(--shadow); }
+.tile .l { font-size: 12.5px; color: var(--ink-2); }
+.tile .v { font-size: 30px; font-weight: 600; line-height: 1.15; margin-top: 2px; }
+.tile .d { font-size: 12.5px; color: var(--muted); margin-top: 2px; }
+.tile .d.good { color: var(--good); }
+
+.grid { display: grid; grid-template-columns: minmax(0, 1.55fr) minmax(300px, 1fr); gap: 14px; margin-bottom: 18px; }
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; box-shadow: var(--shadow); padding: 16px; min-width: 0; }
+.card h2 { font-size: 16px; margin: 0 0 2px; }
+.card .sub { font-size: 13px; color: var(--ink-2); margin: 0 0 10px; }
+.card-head { display: flex; align-items: flex-start; gap: 10px; flex-wrap: wrap; }
+.card-head .right { margin-left: auto; display: flex; gap: 8px; align-items: center; }
+
+#net { width: 100%; height: 560px; display: block; border-radius: 10px; background: var(--surface); touch-action: none; }
+.hull { fill-opacity: .10; stroke-width: 1.5; stroke-opacity: .9; stroke-linejoin: round; }
+.hull.dim { fill-opacity: .04; stroke-opacity: .35; }
+.hull-label { font-size: 12px; font-weight: 600; fill: var(--ink); paint-order: stroke; stroke: var(--surface); stroke-width: 4px; stroke-linejoin: round; }
+.link { stroke: var(--axis); stroke-opacity: .55; }
+.link.in { stroke-opacity: .9; }
+.link.dim { stroke-opacity: .12; }
+.node { stroke: var(--surface); stroke-width: 2px; cursor: pointer; }
+.node.dim { opacity: .35; }
+.node.sel { stroke: var(--ink); stroke-width: 2.5px; }
+.node-label { font-size: 11px; fill: var(--ink); pointer-events: none; paint-order: stroke; stroke: var(--surface); stroke-width: 3px; }
+.legend { display: flex; gap: 16px; align-items: center; flex-wrap: wrap; font-size: 12.5px; color: var(--ink-2); margin-top: 8px; }
+.legend .ramp { display: inline-block; width: 120px; height: 10px; border-radius: 5px; background: linear-gradient(90deg, var(--div-neg), var(--div-mid), var(--div-pos)); vertical-align: middle; margin: 0 6px; }
+.legend .dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: var(--muted); vertical-align: middle; margin-right: 4px; opacity: .5; }
+
+.modlist { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.mod { display: grid; grid-template-columns: 14px 1fr auto; gap: 10px; align-items: center; padding: 9px 10px; border-radius: 10px; border: 1px solid transparent; cursor: pointer; background: transparent; width: 100%; text-align: left; font: inherit; color: inherit; }
+.mod:hover { background: var(--surface-2); }
+.mod[aria-pressed="true"] { border-color: var(--border); background: var(--surface-2); }
+.mod .sw { width: 12px; height: 12px; border-radius: 3px; }
+.mod .nm { font-weight: 600; font-size: 14px; }
+.mod .meta { font-size: 12px; color: var(--muted); }
+.mod .score { font-variant-numeric: tabular-nums; font-weight: 600; font-size: 14px; }
+.mod .bar { grid-column: 2 / 4; height: 6px; border-radius: 3px; background: var(--surface-2); overflow: hidden; }
+.mod .bar > i { display: block; height: 100%; border-radius: 3px; }
+.detail { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border); }
+.detail h3 { margin: 0 0 4px; font-size: 15px; display: flex; align-items: center; gap: 8px; }
+.detail p { margin: 4px 0; font-size: 13.5px; color: var(--ink-2); }
+.kv { display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; font-size: 13px; margin: 8px 0; }
+.kv dt { color: var(--muted); } .kv dd { margin: 0; font-variant-numeric: tabular-nums; }
+.chips { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 6px; }
+.chip { font-size: 12px; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--border); background: var(--surface); color: var(--ink-2); display: inline-flex; align-items: center; gap: 5px; }
+.chip i { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+
+.smalls { display: grid; grid-template-columns: repeat(6, 1fr); gap: 10px; }
+.small { min-width: 0; }
+.small .t { font-size: 12.5px; font-weight: 600; margin-bottom: 2px; display: flex; align-items: center; gap: 6px; }
+.small .t i { width: 10px; height: 10px; border-radius: 3px; display: inline-block; }
+.small svg { width: 100%; height: 150px; display: block; }
+.axis text { fill: var(--muted); font-size: 11px; }
+.axis line, .axis path { stroke: var(--axis); }
+.gridline { stroke: var(--grid); stroke-width: 1; }
+.mean-line { fill: none; stroke-width: 2px; stroke-linejoin: round; stroke-linecap: round; }
+.rep { stroke: var(--surface); stroke-width: 2px; }
+
+.pipeline { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; }
+.step { background: var(--surface-2); border-radius: 12px; padding: 12px 14px; min-width: 0; }
+.step .n { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .08em; font-weight: 700; }
+.step h4 { margin: 4px 0 4px; font-size: 14px; }
+.step p { margin: 0; font-size: 12.5px; color: var(--ink-2); }
+.step svg { width: 100%; height: 56px; display: block; margin-bottom: 4px; }
+.step svg * { vector-effect: non-scaling-stroke; }
+
+table.tv { width: 100%; border-collapse: collapse; font-size: 13px; }
+table.tv th, table.tv td { text-align: left; padding: 7px 8px; border-bottom: 1px solid var(--grid); vertical-align: top; }
+table.tv th { font-size: 12px; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: .05em; }
+table.tv td.num { font-variant-numeric: tabular-nums; text-align: right; }
+table.tv th.num { text-align: right; }
+.tv-wrap { overflow-x: auto; }
+details > summary { cursor: pointer; color: var(--ink-2); font-size: 13.5px; }
+
+.tooltip { position: fixed; pointer-events: none; z-index: 20; background: var(--surface); color: var(--ink); border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; font-size: 12.5px; box-shadow: var(--shadow); max-width: 260px; opacity: 0; transition: opacity .08s; }
+.tooltip .v { font-weight: 700; font-size: 14px; }
+.tooltip .k { color: var(--ink-2); }
+.tooltip .key { display: inline-block; width: 12px; height: 3px; border-radius: 2px; vertical-align: middle; margin-right: 6px; }
+
+footer { padding: 24px 0 40px; font-size: 13px; color: var(--ink-2); }
+footer p { margin: 6px 0; max-width: 820px; }
+.note { background: var(--surface-2); border-left: 3px solid var(--warn); padding: 10px 14px; border-radius: 8px; font-size: 13.5px; color: var(--ink-2); margin: 0 0 18px; }
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+
+@media (max-width: 1000px) {
+  .grid { grid-template-columns: 1fr; }
+  .smalls { grid-template-columns: repeat(3, 1fr); }
+  .pipeline { grid-template-columns: repeat(2, 1fr); }
+  .tiles { grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 560px) {
+  #net { height: 440px; }
+  .smalls { grid-template-columns: repeat(2, 1fr); }
+  .pipeline { grid-template-columns: 1fr; }
+  .tile .v { font-size: 24px; }
+}
+</style>
+</head>
+<body>
+
+<header class="top wrap">
+  <div class="brandline">
+    <span>Guo Lab, Computer Science</span><span aria-hidden="true">·</span>
+    <span>Orbach Lab, Biomedical Engineering</span><span aria-hidden="true">·</span>
+    <span>Rowan University</span>
+  </div>
+  <div class="topline">
+    <div>
+      <h1>Liver Injury Network Explorer</h1>
+      <p class="lede">Prototype of the analysis platform we will build: experimental measurements from human liver spheroids treated with the chemotherapy drug cyclophosphamide are mapped onto a protein interaction network, and graph mining finds the connected groups of genes and cytokines that change together as injury develops.</p>
+    </div>
+    <div class="toolbar">
+      <span class="badge sim" title="No experiments have been run yet. Every number on this page is generated to illustrate the planned workflow.">&#9888; Simulated data</span>
+      <button class="ghost" id="themeBtn" type="button" aria-label="Toggle color theme">Theme</button>
+    </div>
+  </div>
+</header>
+
+<div class="filters"><div class="wrap row">
+  <div class="fgroup"><span class="lbl">Condition</span>
+    <div class="seg" role="group" aria-label="Treatment condition" id="condSeg">
+      <button type="button" data-cond="0" aria-pressed="false">Control</button>
+      <button type="button" data-cond="1" aria-pressed="false">½ LC50</button>
+      <button type="button" data-cond="2" aria-pressed="true">LC50</button>
+    </div>
+  </div>
+  <div class="fgroup"><span class="lbl">Evidence layer</span>
+    <div class="seg" role="group" aria-label="Measurement layer" id="layerSeg">
+      <button type="button" data-layer="rna" aria-pressed="true">RNA-seq (genes)</button>
+      <button type="button" data-layer="cyt" aria-pressed="false">Secreted cytokines</button>
+    </div>
+  </div>
+  <div class="fgroup"><span class="lbl">Labels</span>
+    <div class="seg" role="group" aria-label="Node labels" id="labelSeg">
+      <button type="button" data-labels="module" aria-pressed="true">Selected module</button>
+      <button type="button" data-labels="all" aria-pressed="false">All genes</button>
+    </div>
+  </div>
+</div></div>
+
+<main class="wrap">
+  <p class="note"><strong>What you are looking at.</strong> This page demonstrates the output the NJHF project will produce. The gene names and pathways are real liver-injury biology; the measurements are simulated so the interface can be explored before the experiments are run. Nothing here is an experimental result.</p>
+
+  <section class="tiles" aria-label="Summary">
+    <div class="tile"><div class="l">Cell injury (LDH release)</div><div class="v" id="t-ldh">–</div><div class="d" id="t-ldh-d">of maximum, mean of 3 pools</div></div>
+    <div class="tile"><div class="l">Genes on the network</div><div class="v" id="t-genes">–</div><div class="d">after filtering low counts</div></div>
+    <div class="tile"><div class="l">Injury modules found</div><div class="v" id="t-mods">–</div><div class="d">connected, dose-responsive, robust</div></div>
+    <div class="tile"><div class="l">Top module score</div><div class="v" id="t-score">–</div><div class="d" id="t-score-d">–</div></div>
+  </section>
+
+  <section class="grid">
+    <div class="card">
+      <div class="card-head">
+        <div><h2>Interaction network with discovered modules</h2>
+        <p class="sub">Each dot is a gene (or secreted cytokine). Color is its change versus untreated control; outlined regions are the modules the search found. Drag to rearrange, hover for values, click a module to inspect it. Hold Ctrl (or ⌘) and scroll to zoom.</p></div>
+        <div class="right"><button class="ghost" type="button" id="resetBtn">Reset view</button></div>
+      </div>
+      <svg id="net" role="img" aria-label="Force-directed gene interaction network with highlighted injury modules"></svg>
+      <div class="legend">
+        <span>Down <span class="ramp"></span> Up (log<sub>2</sub> fold change vs control)</span>
+        <span><span class="dot"></span>Not measured in this layer</span>
+        <span>Dot size = number of interactions</span>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Module ranking</h2>
+      <p class="sub">Score combines treatment response, interaction support, compactness, and agreement between RNA and cytokine layers.</p>
+      <ul class="modlist" id="modlist"></ul>
+      <div class="detail" id="detail"></div>
+    </div>
+  </section>
+
+  <section class="card" style="margin-bottom:18px">
+    <div class="card-head">
+      <div><h2>Dose response of module activity</h2>
+      <p class="sub">Mean activity of each module across the three conditions, with the three pooled replicates shown as dots. The injury readout (LDH) is shown on the same footing for comparison.</p></div>
+      <div class="right"><button class="ghost" type="button" id="tableBtn" aria-expanded="false" aria-controls="tableView">Table view</button></div>
+    </div>
+    <div class="smalls" id="smalls"></div>
+    <div id="tableView" hidden style="margin-top:14px">
+      <div class="tv-wrap"><table class="tv" id="actTable"></table></div>
+    </div>
+  </section>
+
+  <section class="card" style="margin-bottom:18px">
+    <h2>How the pipeline works</h2>
+    <p class="sub">Aim 1 produces the measurements (Orbach lab); Aim 2 turns them into ranked network modules (Guo lab).</p>
+    <div class="pipeline">
+      <div class="step"><svg viewBox="0 0 120 56" aria-hidden="true"><g fill="none" stroke="var(--s1)" stroke-width="2"><circle cx="60" cy="28" r="18"/><circle cx="54" cy="24" r="3"/><circle cx="64" cy="22" r="3"/><circle cx="60" cy="33" r="3"/><circle cx="68" cy="31" r="3"/><circle cx="52" cy="33" r="3"/></g></svg><div class="n">Step 1</div><h4>Liver spheroids</h4><p>HepaRG cells self-assemble into 200 µm spheroids that keep drug-metabolizing enzymes active.</p></div>
+      <div class="step"><svg viewBox="0 0 120 56" aria-hidden="true"><g fill="none" stroke="var(--s2)" stroke-width="2"><rect x="20" y="22" width="80" height="22" rx="4"/><circle cx="32" cy="33" r="4"/><circle cx="46" cy="33" r="4"/><circle cx="60" cy="33" r="4"/><circle cx="74" cy="33" r="4"/><circle cx="88" cy="33" r="4"/><path d="M60 8v10"/></g></svg><div class="n">Step 2</div><h4>Cyclophosphamide exposure</h4><p>Control, ½ LC50 and LC50 for 24 h; three pooled replicates per condition.</p></div>
+      <div class="step"><svg viewBox="0 0 120 56" aria-hidden="true"><g fill="none" stroke="var(--s3)" stroke-width="2"><path d="M20 44 L20 12 M20 44 L100 44"/><rect x="30" y="30" width="8" height="14"/><rect x="44" y="20" width="8" height="24"/><rect x="58" y="14" width="8" height="30"/><rect x="72" y="24" width="8" height="20"/><rect x="86" y="34" width="8" height="10"/></g></svg><div class="n">Step 3</div><h4>Three readouts</h4><p>LDH for cell death, bulk RNA-seq for gene activity, a 105-cytokine array for inflammatory signals.</p></div>
+      <div class="step"><svg viewBox="0 0 120 56" aria-hidden="true"><g fill="none" stroke="var(--s4)" stroke-width="2"><path d="M30 40 L50 20 L70 36 L90 16 M50 20 L70 14 M70 36 L90 40"/><circle cx="30" cy="40" r="4"/><circle cx="50" cy="20" r="4"/><circle cx="70" cy="36" r="4"/><circle cx="90" cy="16" r="4"/><circle cx="70" cy="14" r="4"/><circle cx="90" cy="40" r="4"/></g></svg><div class="n">Step 4</div><h4>Map onto STRING</h4><p>Measurements become node weights on a human protein interaction network.</p></div>
+      <div class="step"><svg viewBox="0 0 120 56" aria-hidden="true"><g fill="none" stroke="var(--s5)" stroke-width="2"><path d="M40 20 L60 12 L80 22 L74 42 L46 42 Z"/><circle cx="40" cy="20" r="3"/><circle cx="60" cy="12" r="3"/><circle cx="80" cy="22" r="3"/><circle cx="74" cy="42" r="3"/><circle cx="46" cy="42" r="3"/><circle cx="60" cy="28" r="3"/><path d="M60 28 L40 20 M60 28 L80 22 M60 28 L46 42"/></g></svg><div class="n">Step 5</div><h4>Search for modules</h4><p>A scalable subgraph search finds compact, connected, dose-responsive modules and ranks them.</p></div>
+    </div>
+  </section>
+
+  <section class="card" style="margin-bottom:18px">
+    <h2>Why this matters</h2>
+    <p class="sub" style="margin-bottom:6px">Drug-induced liver injury is a leading cause of dose reduction and treatment interruption in cancer care, and patients on the same drug respond very differently. Single-gene biomarkers capture only a fragment of the biology. Network modules are more robust, point directly at mechanisms, and generate testable hypotheses for follow-up studies and larger NIH and NSF applications.</p>
+    <details><summary>Methods behind the prototype (what the real pipeline will do)</summary>
+      <p style="font-size:13.5px;color:var(--ink-2)">Raw counts are filtered and normalized; treatment effects are estimated per gene with a count-based model (DESeq2). The STRING human network is loaded at a recorded version and confidence threshold. Cytokines from the array are linked to their encoding genes but kept as a separate evidence layer. Module discovery is an optimization over connected subgraphs balancing response strength, interaction support, compactness and cross-layer agreement; a greedy grow-and-refine search seeded at high-scoring nodes is compared with top-gene ranking and community-detection baselines. Modules are tested against size- and degree-matched random gene sets, and their stability is checked by varying thresholds and leaving out samples. Module activity per sample is the mean normalized expression of its members.</p>
+    </details>
+  </section>
+</main>
+
+<div class="tooltip" id="tip" role="status" aria-live="polite"></div>
+
+<footer class="wrap">
+  <p><strong>Prototype for the New Jersey Health Foundation Research Grant application (2026).</strong> Guimu Guo, Ph.D. (PI, Computer Science) and Sophia Orbach, Ph.D. (Co-PI, Biomedical Engineering), Rowan University.</p>
+  <p>All measurements on this page are simulated to demonstrate the interface and analysis outputs. Gene symbols and pathway groupings reflect established liver-injury biology; module scores, fold changes and LDH values do not come from any experiment.</p>
+</footer>
+
+<script>
+/* ---------------- deterministic simulated dataset ---------------- */
+function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
+const rnd = mulberry32(20261116);
+const gauss = () => { let u=0,v=0; while(u===0)u=rnd(); while(v===0)v=rnd(); return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v); };
+
+const COND = ['Control', '½ LC50', 'LC50'];
+const MODULES = [
+  { id:'m1', name:'Oxidative stress / NRF2 response', slot:1, dir:+1, amp:[0, 1.3, 2.4],
+    pathway:'Glutathione synthesis and antioxidant defense (KEGG: glutathione metabolism; Reactome: NRF2 targets)',
+    genes:['NFE2L2','KEAP1','HMOX1','NQO1','GCLC','GCLM','TXNRD1','SRXN1','GSTA1','GPX2','SQSTM1','FTH1'] },
+  { id:'m2', name:'ER stress / unfolded protein response', slot:2, dir:+1, amp:[0, 0.8, 2.1],
+    pathway:'PERK and IRE1 branches of the unfolded protein response (Reactome: UPR)',
+    genes:['HSPA5','ATF4','DDIT3','XBP1','ATF6','ERN1','EIF2AK3','HERPUD1','DNAJB9','PPP1R15A','TRIB3'] },
+  { id:'m3', name:'Inflammatory cytokine signaling', slot:3, dir:+1, amp:[0, 0.9, 1.9],
+    pathway:'NF-κB and IL-6/STAT3 signaling (KEGG: cytokine–cytokine receptor interaction)',
+    genes:['TNF','IL6','IL1B','CXCL8','CCL2','NFKB1','RELA','NFKBIA','IL1A','CXCL1','CXCL10','SOCS3','STAT3'],
+    cytokines:['TNF','IL6','IL1B','CXCL8','CCL2','IL1A','CXCL1','CXCL10'] },
+  { id:'m4', name:'Hepatocyte function loss', slot:4, dir:-1, amp:[0, 0.6, 1.7],
+    pathway:'Plasma protein secretion and xenobiotic metabolism (KEGG: complement and coagulation; drug metabolism by P450)',
+    genes:['ALB','APOA1','APOB','TTR','TF','SERPINA1','CYP3A4','CYP2B6','CYP2E1','HNF4A','HNF1A','FGB','AHSG'] },
+  { id:'m5', name:'DNA damage / apoptosis', slot:5, dir:+1, amp:[0, 0.5, 1.6],
+    pathway:'p53 signaling and intrinsic apoptosis (KEGG: p53 signaling pathway)',
+    genes:['TP53','CDKN1A','BAX','BBC3','PMAIP1','GADD45A','CASP3','CASP9','FAS','MDM2','BCL2','APAF1'] },
+];
+const BACKGROUND = ['ACTB','GAPDH','TUBB','RPL13A','EEF1A1','PPIA','B2M','HPRT1','PGK1','LDHA','ENO1','PKM','ALDOA','TPI1','G6PD','PGD','TKT','ACLY','FASN','SCD','ACACA','HMGCR','LDLR','SREBF1','PPARA','CPT1A','ACOX1','HADHA','PCK1','G6PC1','FBP1','GYS2','PYGL','INSR','IRS1','AKT1','MTOR','RPS6KB1','EIF4EBP1','MAPK1','MAPK3','MAP2K1','RAF1','KRAS','EGFR','ERBB2','SRC','PTK2','CTNNB1','CDH1','VIM','FN1','COL1A1','COL4A1','LAMB1','ITGB1','ITGA5','MMP2','TIMP1','TGFB1','SMAD2','SMAD3','SMAD7','CCND1','CDK4','CDK2','CCNE1','E2F1','RB1','PCNA','MCM2','TOP2A','MKI67','AURKA','PLK1','CDC20','BUB1','HDAC1','EP300','CREBBP','KAT2A','SIRT1','NAMPT','NNMT','MAT1A','AHCY','CBS','CTH','UGT1A1','SULT1A1','ABCB1','ABCC2','SLCO1B1','ABCG2','NR1I2','NR1I3','AHR','CYP1A2','CYP2C9','CYP2D6','FMO3','MAOA','ALDH2','ADH1B','HSD17B4','SOD1','SOD2','CAT','PRDX1','PRDX3','GSR','TXN','ATG5','BECN1','MAP1LC3B','LAMP1','CTSB','TFEB'];
+
+const nodes = [], edges = [], byId = new Map();
+const addNode = (id, mod, isCyt) => { const n = { id, mod, isCyt: !!isCyt, fc: [0,0,0] }; nodes.push(n); byId.set(id, n); return n; };
+MODULES.forEach(m => { m.genes.forEach(g => addNode(g, m.id, m.cytokines && m.cytokines.includes(g))); });
+BACKGROUND.forEach(g => addNode(g, null, false));
+
+// fold changes: module genes respond with dose, background wobbles
+nodes.forEach(n => {
+  const m = n.mod ? MODULES.find(x => x.id === n.mod) : null;
+  for (let c = 0; c < 3; c++) {
+    if (m) { const strength = 0.65 + rnd()*0.7; n.fc[c] = m.dir * m.amp[c] * strength + 0.18*gauss(); }
+    else n.fc[c] = 0.22*gauss() * (c === 0 ? 0.6 : 1);
+    if (c === 0) n.fc[c] *= 0.4;
+  }
+});
+// a few background genes with modest dose response (noise, non-modular)
+['SOD2','TIMP1','MMP2','TGFB1','ABCC2','CCND1','NAMPT'].forEach(g => { const n = byId.get(g); n.fc = [0.1*gauss(), 0.6+0.2*gauss(), 1.0+0.3*gauss()]; });
+
+// edges: dense within modules, sparse background, some cross-links
+const edgeKey = new Set();
+const link = (a, b, w) => { const k = a < b ? a+'|'+b : b+'|'+a; if (a === b || edgeKey.has(k)) return; edgeKey.add(k); edges.push({ source: a, target: b, w }); };
+MODULES.forEach(m => { const g = m.genes; for (let i = 0; i < g.length; i++) for (let j = i+1; j < g.length; j++) if (rnd() < 0.42) link(g[i], g[j], 0.6 + 0.4*rnd()); });
+// hub connectivity within modules so each is connected
+MODULES.forEach(m => { const hub = m.genes[0]; m.genes.slice(1).forEach(g => { if (rnd() < 0.5) link(hub, g, 0.7 + 0.3*rnd()); }); });
+// background: ring-ish + random
+for (let i = 0; i < BACKGROUND.length; i++) { link(BACKGROUND[i], BACKGROUND[(i+1) % BACKGROUND.length], 0.4+0.4*rnd()); if (rnd() < 0.6) link(BACKGROUND[i], BACKGROUND[Math.floor(rnd()*BACKGROUND.length)], 0.4+0.4*rnd()); if (rnd() < 0.35) link(BACKGROUND[i], BACKGROUND[Math.floor(rnd()*BACKGROUND.length)], 0.4+0.3*rnd()); }
+// cross links between modules and to background
+const cross = [['NFE2L2','SQSTM1'],['SQSTM1','MAP1LC3B'],['ATF4','DDIT3'],['DDIT3','BBC3'],['DDIT3','PMAIP1'],['TP53','MDM2'],['TP53','BAX'],['HMOX1','SOD2'],['NQO1','SOD2'],['IL6','STAT3'],['STAT3','SOCS3'],['TNF','RELA'],['RELA','NFKBIA'],['IL6','TIMP1'],['TGFB1','SMAD3'],['TGFB1','COL1A1'],['HNF4A','PPARA'],['HNF4A','CYP3A4'],['NR1I2','CYP3A4'],['NR1I3','CYP2B6'],['CYP2E1','HMOX1'],['NFE2L2','G6PD'],['NFE2L2','TXN'],['TXNRD1','TXN'],['GSR','GCLC'],['ATF4','TRIB3'],['TRIB3','AKT1'],['CASP3','PARP'],['ERN1','XBP1'],['XBP1','HSPA5'],['ALB','TTR'],['APOA1','APOB'],['TP53','CDKN1A'],['CDKN1A','CCND1'],['CDKN1A','PCNA'],['BAX','BCL2'],['BCL2','BECN1'],['IL1B','NFKB1'],['CXCL8','CXCL1'],['KEAP1','SQSTM1'],['CCL2','MMP2'],['HSPA5','ATF6'],['EIF2AK3','ATF4'],['GPX2','GSR'],['FTH1','HMOX1'],['APAF1','CASP9'],['CASP9','CASP3'],['FAS','CASP3'],['SERPINA1','HNF1A'],['FGB','HNF1A'],['AHSG','HNF4A'],['TF','HNF4A']];
+cross.forEach(([a, b]) => { if (byId.has(a) && byId.has(b)) link(a, b, 0.5 + 0.4*rnd()); });
+MODULES.forEach(m => m.genes.forEach(g => { if (rnd() < 0.35) link(g, BACKGROUND[Math.floor(rnd()*BACKGROUND.length)], 0.3 + 0.3*rnd()); }));
+nodes.forEach(n => n.deg = 0); edges.forEach(e => { byId.get(e.source).deg++; byId.get(e.target).deg++; });
+
+// cytokine layer: only cytokine nodes measured (protein in medium). Slightly different values than RNA.
+nodes.forEach(n => { n.cyt = n.isCyt ? n.fc.map((v, c) => v*0.85 + 0.15*gauss()*(c ? 1 : 0.4)) : null; });
+
+// module activity per sample (3 replicates x 3 conditions) and LDH
+const LDH = { mean: [8.2, 27.4, 50.3], reps: [[7.1, 8.9, 8.6], [25.0, 29.1, 28.1], [47.8, 52.9, 50.2]] };
+MODULES.forEach(m => {
+  m.activity = [0,1,2].map(c => { const mean = d3.mean(m.genes.map(g => byId.get(g).fc[c])); return [0,1,2].map(() => mean + 0.12*gauss()*(c ? 1.2 : 0.6)); });
+  m.actMean = m.activity.map(r => d3.mean(r));
+  const resp = Math.abs(m.actMean[2] - m.actMean[0]);
+  const inner = edges.filter(e => m.genes.includes(e.source) && m.genes.includes(e.target)).length;
+  const density = inner / (m.genes.length*(m.genes.length-1)/2);
+  const r = d3.mean(m.actMean.map((a, i) => a * LDH.mean[i])) ; // crude
+  m.ldhCorr = m.dir > 0 ? 0.86 + 0.1*rnd() : -(0.8 + 0.12*rnd());
+  m.concord = m.cytokines ? 0.78 + 0.12*rnd() : null;
+  m.stability = 0.72 + 0.25*rnd();
+  m.score = +(resp * 1.0 + density * 1.2 + (m.concord ? 0.5 : 0) + m.stability*0.6 - 0.02*m.genes.length).toFixed(2);
+  m.density = density; m.inner = inner;
+});
+MODULES.sort((a, b) => b.score - a.score);
+MODULES.forEach((m, i) => m.rank = i + 1);
+
+/* ---------------- state ---------------- */
+const state = { cond: 2, layer: 'rna', labels: 'module', selected: MODULES[0].id };
+const css = v => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+const slotColor = s => css('--s' + s);
+const modById = id => MODULES.find(m => m.id === id);
+const fmt1 = d3.format('.1f'), fmt2 = d3.format('+.2f');
+
+/* ---------------- tooltip ---------------- */
+const tip = document.getElementById('tip');
+function showTip(html, x, y) { tip.innerHTML = ''; tip.appendChild(html); tip.style.opacity = 1; moveTip(x, y); }
+function moveTip(x, y) { const w = tip.offsetWidth, h = tip.offsetHeight; let L = x + 14, T = y + 14; if (L + w > innerWidth - 8) L = x - w - 14; if (T + h > innerHeight - 8) T = y - h - 14; tip.style.left = L + 'px'; tip.style.top = T + 'px'; }
+function hideTip() { tip.style.opacity = 0; }
+function el(tag, cls, text) { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
+
+/* ---------------- network ---------------- */
+const svg = d3.select('#net');
+const gRoot = svg.append('g');
+const gHull = gRoot.append('g'), gLink = gRoot.append('g'), gNode = gRoot.append('g'), gLabel = gRoot.append('g'), gHullLabel = gRoot.append('g');
+let W = 800, H = 560;
+function size() { const r = svg.node().getBoundingClientRect(); W = r.width; H = r.height; }
+size();
+const zoom = d3.zoom().scaleExtent([0.5, 3]).filter(ev => (ev.type !== 'wheel' || ev.ctrlKey || ev.metaKey) && !ev.button).on('zoom', ev => gRoot.attr('transform', ev.transform));
+svg.call(zoom).on('dblclick.zoom', null);
+document.getElementById('resetBtn').addEventListener('click', () => { svg.transition().duration(400).call(zoom.transform, d3.zoomIdentity); sim.alpha(0.4).restart(); });
+
+const rScale = d3.scaleSqrt().domain([1, d3.max(nodes, n => n.deg)]).range([4, 11]);
+const simNodes = nodes, simLinks = edges.map(e => ({ ...e }));
+const sim = d3.forceSimulation(simNodes)
+  .force('link', d3.forceLink(simLinks).id(d => d.id).distance(l => l.w > 0.6 ? 36 : 60).strength(l => l.w > 0.6 ? 0.7 : 0.2))
+  .force('charge', d3.forceManyBody().strength(-130))
+  .force('collide', d3.forceCollide(d => rScale(d.deg) + (d.mod ? 14 : 5)))
+  .force('center', d3.forceCenter(W/2, H/2))
+  .force('x', d3.forceX(W/2).strength(0.035)).force('y', d3.forceY(H/2).strength(0.05));
+// pull modules toward distinct anchors so hulls don't overlap much
+const anchors = { m1: [0.22, 0.28], m2: [0.78, 0.28], m3: [0.78, 0.74], m4: [0.22, 0.74], m5: [0.5, 0.5] };
+sim.force('mx', d3.forceX(d => d.mod ? anchors[d.mod][0]*W : W/2).strength(d => d.mod ? 0.18 : 0.02))
+   .force('my', d3.forceY(d => d.mod ? anchors[d.mod][1]*H : H/2).strength(d => d.mod ? 0.18 : 0.02));
+
+const linkSel = gLink.selectAll('line').data(simLinks).join('line').attr('class', 'link').attr('stroke-width', d => d.w > 0.6 ? 1.2 : 0.8);
+const nodeSel = gNode.selectAll('circle').data(simNodes).join('circle').attr('class', 'node').attr('r', d => rScale(d.deg)).style('pointer-events', 'none');
+const gHit = gRoot.append('g');
+const hitSel = gHit.selectAll('circle').data(simNodes).join('circle').attr('r', d => Math.max(12, rScale(d.deg) + 6)).attr('fill', 'transparent').attr('tabindex', 0).style('cursor', 'pointer').attr('aria-label', d => d.id)
+  .call(d3.drag().on('start', (ev, d) => { if (!ev.active) sim.alphaTarget(0.25).restart(); d.fx = d.x; d.fy = d.y; }).on('drag', (ev, d) => { d.fx = ev.x; d.fy = ev.y; }).on('end', (ev, d) => { if (!ev.active) sim.alphaTarget(0); d.fx = null; d.fy = null; }))
+  .on('pointerenter pointermove', (ev, d) => { showTip(nodeTip(d), ev.clientX, ev.clientY); })
+  .on('pointerleave', hideTip)
+  .on('focus', (ev, d) => { const r = ev.target.getBoundingClientRect(); showTip(nodeTip(d), r.left + r.width/2, r.top); })
+  .on('blur', hideTip)
+  .on('click', (ev, d) => { if (d.mod) select(d.mod); });
+const labelSel = gLabel.selectAll('text').data(simNodes).join('text').attr('class', 'node-label').attr('dy', d => -rScale(d.deg) - 3).attr('text-anchor', 'middle').text(d => d.id);
+const hullSel = gHull.selectAll('path').data(MODULES, d => d.id).join('path').attr('class', 'hull')
+  .on('click', (ev, d) => select(d.id)).style('cursor', 'pointer');
+const hullLabelSel = gHullLabel.selectAll('text').data(MODULES, d => d.id).join('text').attr('class', 'hull-label').attr('text-anchor', 'middle').text(d => d.name);
+
+function nodeTip(d) {
+  const box = el('div');
+  const v = valueOf(d);
+  const head = el('div', 'v', v == null ? 'not measured' : fmt2(v) + ' log₂FC');
+  box.appendChild(head);
+  box.appendChild(el('div', 'k', d.id + (d.isCyt ? ' (secreted cytokine)' : '') + ' · ' + COND[state.cond]));
+  if (d.mod) { const m = modById(d.mod); const r = el('div', 'k'); const key = el('span', 'key'); key.style.background = slotColor(m.slot); r.appendChild(key); r.appendChild(document.createTextNode(m.name)); box.appendChild(r); }
+  box.appendChild(el('div', 'k', d.deg + ' interactions on the network'));
+  return box;
+}
+function valueOf(d) { return state.layer === 'rna' ? d.fc[state.cond] : (d.cyt ? d.cyt[state.cond] : null); }
+function divColor(v) {
+  const neg = css('--div-neg'), mid = css('--div-mid'), pos = css('--div-pos');
+  const t = Math.max(-1, Math.min(1, v / 2.5));
+  return t < 0 ? d3.interpolateLab(mid, neg)(-t) : d3.interpolateLab(mid, pos)(t);
+}
+function hullPath(m) {
+  const pts = m.genes.map(g => byId.get(g)).flatMap(n => { const r = rScale(n.deg) + 10; return [[n.x - r, n.y - r], [n.x + r, n.y - r], [n.x - r, n.y + r], [n.x + r, n.y + r]]; });
+  const h = d3.polygonHull(pts); if (!h) return '';
+  return 'M' + h.map(p => p.join(',')).join('L') + 'Z';
+}
+sim.on('tick', () => {
+  simNodes.forEach(d => { d.x = Math.max(24, Math.min(W - 24, d.x)); d.y = Math.max(30, Math.min(H - 24, d.y)); });
+  linkSel.attr('x1', d => d.source.x).attr('y1', d => d.source.y).attr('x2', d => d.target.x).attr('y2', d => d.target.y);
+  nodeSel.attr('cx', d => d.x).attr('cy', d => d.y);
+  hitSel.attr('cx', d => d.x).attr('cy', d => d.y);
+  labelSel.attr('x', d => d.x).attr('y', d => d.y);
+  hullSel.attr('d', hullPath);
+  hullLabelSel.attr('x', m => Math.max(120, Math.min(W - 120, d3.mean(m.genes, g => byId.get(g).x)))).attr('y', m => Math.max(14, d3.min(m.genes, g => byId.get(g).y) - 20));
+});
+
+function paintNetwork() {
+  const sel = state.selected;
+  nodeSel.attr('fill', d => { const v = valueOf(d); return v == null ? css('--muted') : divColor(v); })
+    .attr('opacity', d => valueOf(d) == null ? 0.45 : 1)
+    .classed('dim', d => sel && d.mod && d.mod !== sel ? false : false)
+    .classed('sel', d => d.mod === sel);
+  linkSel.classed('in', d => d.source.mod && d.source.mod === sel && d.target.mod === sel);
+  hullSel.attr('fill', m => slotColor(m.slot)).attr('stroke', m => slotColor(m.slot)).classed('dim', m => m.id !== sel);
+  labelSel.style('display', d => state.labels === 'all' || (state.labels === 'module' && d.mod === sel) ? null : 'none');
+}
+
+/* ---------------- module list & detail ---------------- */
+const listEl = document.getElementById('modlist');
+function renderList() {
+  listEl.innerHTML = '';
+  const max = d3.max(MODULES, m => m.score);
+  MODULES.forEach(m => {
+    const li = el('li');
+    const b = el('button', 'mod'); b.type = 'button'; b.setAttribute('aria-pressed', String(m.id === state.selected));
+    const sw = el('span', 'sw'); sw.style.background = slotColor(m.slot);
+    const txt = el('div'); txt.appendChild(el('div', 'nm', m.rank + '. ' + m.name));
+    txt.appendChild(el('div', 'meta', m.genes.length + ' genes · ' + (m.dir > 0 ? 'up' : 'down') + ' with dose' + (m.cytokines ? ' · cytokines agree' : '')));
+    const sc = el('div', 'score', m.score.toFixed(2));
+    const bar = el('div', 'bar'); const fill = el('i'); fill.style.width = (m.score / max * 100) + '%'; fill.style.background = slotColor(m.slot); bar.appendChild(fill);
+    b.append(sw, txt, sc, bar);
+    b.addEventListener('click', () => select(m.id));
+    li.appendChild(b); listEl.appendChild(li);
+  });
+}
+function renderDetail() {
+  const m = modById(state.selected); const d = document.getElementById('detail'); d.innerHTML = '';
+  const h = el('h3'); const sw = el('span', 'sw'); sw.style.cssText = 'width:12px;height:12px;border-radius:3px;display:inline-block;background:' + slotColor(m.slot); h.append(sw, document.createTextNode(m.name)); d.appendChild(h);
+  d.appendChild(el('p', null, m.pathway));
+  const kv = el('dl', 'kv');
+  const rows = [
+    ['Activity at ' + COND[state.cond], fmt2(m.actMean[state.cond]) + ' log₂FC (mean of 3 pools)'],
+    ['Response, LC50 vs control', fmt2(m.actMean[2] - m.actMean[0])],
+    ['Interaction support', m.inner + ' edges, density ' + fmt1(m.density*100) + '%'],
+    ['Association with LDH', (m.ldhCorr > 0 ? '+' : '') + fmt1(m.ldhCorr*100)/100 + ' (exploratory)'],
+    ['RNA–cytokine agreement', m.concord ? fmt1(m.concord*100) + '% of members' : 'no cytokines in module'],
+    ['Stability', fmt1(m.stability*100) + '% of resamples'],
+  ];
+  rows.forEach(([k, v]) => { kv.appendChild(el('dt', null, k)); kv.appendChild(el('dd', null, v)); });
+  d.appendChild(kv);
+  const chips = el('div', 'chips');
+  m.genes.map(g => byId.get(g)).sort((a, b) => Math.abs(b.fc[state.cond]) - Math.abs(a.fc[state.cond])).forEach(n => { const c = el('span', 'chip'); const i = el('i'); i.style.background = divColor(n.fc[state.cond]); c.append(i, document.createTextNode(n.id + ' ' + fmt2(n.fc[state.cond]))); chips.appendChild(c); });
+  d.appendChild(chips);
+}
+function select(id) { state.selected = id; renderList(); renderDetail(); paintNetwork(); renderSmalls(); }
+
+/* ---------------- small multiples ---------------- */
+function renderSmalls() {
+  const host = document.getElementById('smalls'); host.innerHTML = '';
+  const series = MODULES.map(m => ({ name: m.name, color: slotColor(m.slot), mean: m.actMean, reps: m.activity, unit: 'log₂FC', dom: [-2.6, 2.6], sel: m.id === state.selected }))
+    .concat([{ name: 'Cell injury (LDH)', color: css('--ink-2'), mean: LDH.mean, reps: LDH.reps, unit: '% of max', dom: [0, 60], sel: false, isLdh: true }]);
+  series.forEach(s => {
+    const box = el('div', 'small'); const t = el('div', 't'); const i = el('i'); i.style.background = s.color; t.append(i, document.createTextNode(s.name)); box.appendChild(t);
+    const w = 200, h = 150, ml = 34, mr = 10, mt = 10, mb = 26;
+    const sv = d3.select(box).append('svg').attr('viewBox', `0 0 ${w} ${h}`).attr('role', 'img').attr('aria-label', s.name + ' across conditions');
+    const x = d3.scalePoint().domain([0,1,2]).range([ml, w - mr]).padding(0.4);
+    const y = d3.scaleLinear().domain(s.dom).range([h - mb, mt]).nice();
+    const ticks = s.isLdh ? [0, 20, 40, 60] : [-2, -1, 0, 1, 2];
+    sv.append('g').selectAll('line').data(ticks).join('line').attr('class', 'gridline').attr('x1', ml).attr('x2', w - mr).attr('y1', y).attr('y2', y);
+    if (!s.isLdh) sv.append('line').attr('x1', ml).attr('x2', w - mr).attr('y1', y(0)).attr('y2', y(0)).attr('stroke', css('--axis'));
+    sv.append('g').attr('class', 'axis').selectAll('text').data(ticks).join('text').attr('x', ml - 6).attr('y', d => y(d) + 3.5).attr('text-anchor', 'end').text(d => d);
+    sv.append('g').attr('class', 'axis').selectAll('text').data([0,1,2]).join('text').attr('x', d => x(d)).attr('y', h - 8).attr('text-anchor', 'middle').text(d => COND[d]);
+    sv.append('path').attr('class', 'mean-line').attr('stroke', s.color).attr('d', d3.line().x((d, i) => x(i)).y(d => y(d))(s.mean));
+    const reps = s.reps.flatMap((r, c) => r.map(v => ({ c, v })));
+    sv.append('g').selectAll('circle').data(reps).join('circle').attr('class', 'rep').attr('cx', d => x(d.c) + (d.v % 1 > .5 ? 3 : -3)).attr('cy', d => y(d.v)).attr('r', 3.5).attr('fill', s.color).attr('opacity', .8);
+    sv.append('g').selectAll('circle').data(s.mean).join('circle').attr('cx', (d, i) => x(i)).attr('cy', d => y(d)).attr('r', 4.5).attr('fill', s.color).attr('stroke', css('--surface')).attr('stroke-width', 2);
+    // hover: hit targets per condition
+    sv.append('g').selectAll('rect').data([0,1,2]).join('rect').attr('x', d => x(d) - 28).attr('y', mt).attr('width', 56).attr('height', h - mt - mb).attr('fill', 'transparent')
+      .on('pointerenter pointermove', (ev, c) => { const b = el('div'); b.appendChild(el('div', 'v', (s.isLdh ? fmt1(s.mean[c]) + '%' : fmt2(s.mean[c])) + ' mean')); b.appendChild(el('div', 'k', s.name + ' · ' + COND[c])); b.appendChild(el('div', 'k', 'pools: ' + s.reps[c].map(v => s.isLdh ? fmt1(v) : fmt2(v)).join(', '))); showTip(b, ev.clientX, ev.clientY); })
+      .on('pointerleave', hideTip);
+    // direct label: endpoint
+    sv.append('text').attr('class', 'node-label').attr('x', x(2)).attr('y', y(s.mean[2]) - 9).attr('text-anchor', 'middle').style('font-size', '11px').text(s.isLdh ? fmt1(s.mean[2]) + '%' : fmt2(s.mean[2]));
+    if (s.sel) box.style.outline = '2px solid ' + s.color, box.style.outlineOffset = '4px', box.style.borderRadius = '6px';
+    host.appendChild(box);
+  });
+  renderTable();
+}
+function renderTable() {
+  const t = document.getElementById('actTable'); t.innerHTML = '';
+  const thead = el('thead'); const tr = el('tr'); ['Module', 'Rank', 'Score', 'Genes', 'Control', '½ LC50', 'LC50', 'LDH assoc.', 'Stability'].forEach((h, i) => { const th = el('th', i >= 1 ? 'num' : null, h); tr.appendChild(th); }); thead.appendChild(tr); t.appendChild(thead);
+  const tb = el('tbody');
+  MODULES.forEach(m => { const r = el('tr'); [m.name, m.rank, m.score.toFixed(2), m.genes.length, fmt2(m.actMean[0]), fmt2(m.actMean[1]), fmt2(m.actMean[2]), (m.ldhCorr > 0 ? '+' : '') + m.ldhCorr.toFixed(2), fmt1(m.stability*100) + '%'].forEach((v, i) => r.appendChild(el('td', i >= 1 ? 'num' : null, String(v)))); tb.appendChild(r); });
+  const r = el('tr'); ['Cell injury (LDH, % of max)', '', '', '', fmt1(LDH.mean[0]), fmt1(LDH.mean[1]), fmt1(LDH.mean[2]), '', ''].forEach((v, i) => r.appendChild(el('td', i >= 1 ? 'num' : null, v))); tb.appendChild(r);
+  t.appendChild(tb);
+}
+
+/* ---------------- tiles ---------------- */
+function renderTiles() {
+  document.getElementById('t-ldh').textContent = fmt1(LDH.mean[state.cond]) + '%';
+  document.getElementById('t-ldh-d').textContent = state.cond === 0 ? 'untreated baseline, mean of 3 pools' : (state.cond === 1 ? 'at half the LC50, mean of 3 pools' : 'at the LC50, mean of 3 pools');
+  document.getElementById('t-genes').textContent = d3.format(',')(nodes.length * 97); // illustrative genome-scale count
+  document.getElementById('t-mods').textContent = MODULES.length;
+  document.getElementById('t-score').textContent = MODULES[0].score.toFixed(2);
+  document.getElementById('t-score-d').textContent = MODULES[0].name;
+}
+
+/* ---------------- controls ---------------- */
+function seg(id, attr, cb) { const g = document.getElementById(id); g.querySelectorAll('button').forEach(b => b.addEventListener('click', () => { g.querySelectorAll('button').forEach(x => x.setAttribute('aria-pressed', 'false')); b.setAttribute('aria-pressed', 'true'); cb(b.dataset[attr]); })); }
+seg('condSeg', 'cond', v => { state.cond = +v; renderTiles(); renderDetail(); paintNetwork(); });
+seg('layerSeg', 'layer', v => { state.layer = v; paintNetwork(); });
+seg('labelSeg', 'labels', v => { state.labels = v; paintNetwork(); });
+document.getElementById('tableBtn').addEventListener('click', e => { const tv = document.getElementById('tableView'); const open = tv.hidden; tv.hidden = !open; e.currentTarget.setAttribute('aria-expanded', String(open)); e.currentTarget.textContent = open ? 'Hide table' : 'Table view'; });
+document.getElementById('themeBtn').addEventListener('click', () => {
+  const root = document.documentElement; const cur = root.getAttribute('data-theme') || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+  const next = cur === 'dark' ? 'light' : 'dark'; root.setAttribute('data-theme', next);
+  try { localStorage.setItem('theme', next); } catch (e) {}
+  repaintAll();
+});
+try { const t = localStorage.getItem('theme'); if (t) document.documentElement.setAttribute('data-theme', t); } catch (e) {}
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change', repaintAll);
+function repaintAll() { renderList(); renderDetail(); paintNetwork(); renderSmalls(); }
+window.addEventListener('resize', () => { size(); sim.force('center', d3.forceCenter(W/2, H/2)); sim.alpha(0.3).restart(); });
+
+renderTiles(); renderList(); renderDetail(); paintNetwork(); renderSmalls();
+</script>
+</body>
+</html>
