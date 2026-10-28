@@ -620,7 +620,7 @@ function renderTable() {
   const thead = el('thead'); const tr = el('tr'); ['Module', 'Rank', 'Score', 'Genes', 'Control', '½ LC50', 'LC50', 'LDH assoc.', 'Stability'].forEach((h, i) => { const th = el('th', i >= 1 ? 'num' : null, h); tr.appendChild(th); }); thead.appendChild(tr); t.appendChild(thead);
   const tb = el('tbody');
   MODULES.forEach(m => { const r = el('tr'); [m.name, m.rank, m.score.toFixed(2), m.genes.length, fmt2(m.actMean[0]), fmt2(m.actMean[1]), fmt2(m.actMean[2]), (m.ldhCorr > 0 ? '+' : '') + m.ldhCorr.toFixed(2), fmt1(m.stability*100) + '%'].forEach((v, i) => r.appendChild(el('td', i >= 1 ? 'num' : null, String(v)))); tb.appendChild(r); });
-  const r = el('tr'); ['Cell injury (LDH, % of max)', '', '', '', fmt1(LDH.mean[0]), fmt1(LDH.mean[1]), fmt1(LDH.mean[2]), '', ''].forEach((v, i) => r.appendChild(el('td', i >= 1 ? 'num' : null, v))); tb.appendChild(r);
+  const r = el('tr'); ['Cell death (LDH, % of max)', '', '', '', fmt1(LDH.mean[0]), fmt1(LDH.mean[1]), fmt1(LDH.mean[2]), '', ''].forEach((v, i) => r.appendChild(el('td', i >= 1 ? 'num' : null, v))); tb.appendChild(r);
   t.appendChild(tb);
 }
 
