@@ -261,7 +261,7 @@ footer p { margin: 6px 0; max-width: 820px; }
   <p class="note"><strong>What you are looking at.</strong> This page demonstrates the output the NJHF project will produce. The gene names and pathways are real liver-injury biology; the measurements are simulated so the interface can be explored before the experiments are run. Nothing here is an experimental result.</p>
 
   <section class="tiles" aria-label="Summary">
-    <div class="tile"><div class="l">Cell injury (LDH release)</div><div class="v" id="t-ldh">–</div><div class="d" id="t-ldh-d">of maximum, mean of 3 pools</div></div>
+    <div class="tile"><div class="l">Cell death (LDH release)</div><div class="v" id="t-ldh">–</div><div class="d" id="t-ldh-d">of maximum, mean of 3 pools</div></div>
     <div class="tile"><div class="l">Genes on the network</div><div class="v" id="t-genes">–</div><div class="d">after filtering low counts</div></div>
     <div class="tile"><div class="l">Injury modules found</div><div class="v" id="t-mods">–</div><div class="d">connected, dose-responsive, robust</div></div>
     <div class="tile"><div class="l">Top module score</div><div class="v" id="t-score">–</div><div class="d" id="t-score-d">–</div></div>
@@ -293,7 +293,7 @@ footer p { margin: 6px 0; max-width: 820px; }
   <section class="card" style="margin-bottom:18px">
     <div class="card-head">
       <div><h2>Dose response of module activity</h2>
-      <p class="sub">Mean activity of each module across the three conditions, with the three pooled replicates shown as dots. The injury readout (LDH) is shown on the same footing for comparison.</p></div>
+      <p class="sub">Mean activity of each module across the three conditions, with the three pooled replicates shown as dots. The cell-death readout (LDH) is shown on the same footing for comparison.</p></div>
       <div class="right"><button class="ghost" type="button" id="tableBtn" aria-expanded="false" aria-controls="tableView">Table view</button><button class="ghost" type="button" id="csvBtn">Download CSV</button></div>
     </div>
     <div class="smalls" id="smalls"></div>
@@ -588,7 +588,7 @@ function select(id) { state.selected = id; renderList(); renderDetail(); paintNe
 function renderSmalls() {
   const host = document.getElementById('smalls'); host.innerHTML = '';
   const series = MODULES.map(m => ({ name: m.name, color: slotColor(m.slot), mean: m.actMean, reps: m.activity, unit: 'log₂FC', dom: [-2.6, 2.6], sel: m.id === state.selected }))
-    .concat([{ name: 'Cell injury (LDH)', color: css('--ink-2'), mean: LDH.mean, reps: LDH.reps, unit: '% of max', dom: [0, 60], sel: false, isLdh: true }]);
+    .concat([{ name: 'Cell death (LDH)', color: css('--ink-2'), mean: LDH.mean, reps: LDH.reps, unit: '% of max', dom: [0, 60], sel: false, isLdh: true }]);
   series.forEach(s => {
     const box = el('div', 'small'); const t = el('div', 't'); const i = el('i'); i.style.background = s.color; t.append(i, document.createTextNode(s.name)); box.appendChild(t);
     const w = 200, h = 150, ml = 34, mr = 10, mt = 10, mb = 26;
@@ -728,7 +728,7 @@ const TOUR = [
     target: '#net', go: () => { setSeg('condSeg', 'cond', '2'); state.cond = 2; select('m2'); renderTiles(); } },
   { title: 'Nothing happens without the drug', text: 'Switch to the untreated control and the colors fade: the modules only light up as injury develops. That is what makes them candidate signatures of drug-induced injury.',
     target: '#net', go: () => { setSeg('condSeg', 'cond', '0'); state.cond = 0; renderTiles(); renderDetail(); paintNetwork(); } },
-  { title: 'Activity rises with dose', text: 'Each module’s activity climbs from control to half-LC50 to LC50, in step with the cell-injury readout (LDH) on the right. The three dots per condition are the three pooled replicates.',
+  { title: 'Activity rises with dose', text: 'Each module’s activity climbs from control to half-LC50 to LC50, in step with the cell-death readout (LDH) on the right. The three dots per condition are the three pooled replicates.',
     target: '#smalls', go: () => { setSeg('condSeg', 'cond', '2'); state.cond = 2; renderTiles(); renderDetail(); paintNetwork(); } },
   { title: 'Why modules, not single genes', text: 'Drop one replicate and the top-10 gene list reshuffles, while the modules stay put. Raise the confidence threshold and modules that survive are the ones worth following up. Try the controls yourself.',
     target: '#robustCard', go: () => { state.drop = 1; document.getElementById('dropSel').value = '1'; renderRobust(); } },
